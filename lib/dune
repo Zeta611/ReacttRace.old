@@ -1,0 +1,5 @@
+(library
+ (name react_trace)
+ (libraries base stdio monads ppx_show.runtime)
+ (preprocess
+  (pps ppx_jane ppx_show)))
