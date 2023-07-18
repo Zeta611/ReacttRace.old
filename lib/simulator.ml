@@ -40,58 +40,40 @@ module React = struct
       let prev_children, states, effects =
         match prev_bundle with
         | None -> (None, create_state_list (), create_effect_list ())
-        | Some (prev_children, prev_states, prev_effects) ->
-            (Some prev_children, prev_states, prev_effects)
+        | Some (prev_children, states, effects) ->
+            (Some prev_children, states, effects)
       in
-
       set_states_effects states effects;
 
       let children = body props in
       let child_trees =
         match prev_children with
-        | None ->
-            List.map
-              ~f:(fun child -> render_with_tree child None |> snd)
-              children
+        | None -> List.map ~f:(fun child -> get_view_tree child None) children
         | Some prev_children ->
             List.mapi
-              ~f:(fun i child ->
-                render_with_tree child (List.nth prev_children i) |> snd)
+              ~f:(fun i child -> get_view_tree child (List.nth prev_children i))
               children
       in
       Tree { name; children = child_trees; states; effects }
-    and render_with_tree ({ component; props } as ui_element) view_tree =
-      let new_tree =
-        match component with
-        | Null -> Leaf_node
-        | Composite ({ name; _ } as c) -> (
+    and get_view_tree { component; props } view_tree =
+      match component with
+      | Null -> Leaf_node
+      | Composite ({ name; _ } as c) ->
+          let prev_bundle =
             match view_tree with
-            | None (* Initial render *) | Some Leaf_node (* Re-render *) ->
-                (* There is no tree to follow *)
-                children_tree c props
-            | Some
-                (Tree
-                  {
-                    name = prev_name;
-                    children = prev_children;
-                    states = prev_states;
-                    effects = prev_effects;
-                  }) ->
+            | None (* Initial render *) | Some Leaf_node -> None
+            | Some (Tree { name = prev_name; children; states; effects }) ->
                 (* Re-render *)
-                let replaced = String.(name <> prev_name) in
-                if replaced then
-                  (* No longer need--*cannot*--to track the previous tree *)
-                  children_tree c props
+                if String.(name <> prev_name) then
+                  (* Replaced; previous tree is obsolete *)
+                  None
                 else
                   (* Keep track of the previous tree structure to mirror the recursion *)
-                  children_tree
-                    ~prev_bundle:(prev_children, prev_states, prev_effects)
-                    c props)
-      in
-      (ui_element, new_tree)
+                  Some (children, states, effects)
+          in
+          children_tree ?prev_bundle c props
     in
-    let element, new_tree = render_with_tree element !view_tree in
-    view_tree := Some new_tree;
+    view_tree := Some (get_view_tree element !view_tree);
     element
 
   let useState (init : state) : state * (state -> unit) =
