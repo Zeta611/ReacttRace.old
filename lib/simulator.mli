@@ -1,6 +1,11 @@
+exception Invalid_hook_call
+exception Incompatible_useEffect
+
 module React : sig
   type state = Univ.t
   type props = Univ.t
+  type state_eq = state -> state -> bool
+  type effect = unit -> unit
 
   type component = Null | Composite of composite_component
   and composite_component = { name : string; body : props -> ui_element list }
@@ -10,8 +15,7 @@ module React : sig
   val useState : state -> state * (state -> unit)
 
   val useEffect :
-    (unit -> unit) -> (state * (state -> state -> bool)) list -> unit
+    effect -> ?dependencies:(state * state_eq) list -> unit -> unit
 
-  val useEffect0 : (unit -> 'a) -> 'a
   val reset : unit -> unit
 end
