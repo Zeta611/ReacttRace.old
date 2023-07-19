@@ -1,29 +1,37 @@
 open Base
 (* open Stdio *)
 
+exception Invalid_hook_call
+exception Incompatible_useEffect
+
 module React = struct
   type state = Univ.t
   type props = Univ.t
+  type state_eq = state -> state -> bool
 
   type component = Null | Composite of composite_component
   and composite_component = { name : string; body : props -> ui_element list }
   and ui_element = { component : component; props : props }
+
+  type dependencies = Dependencies of state list | No_dependencies
+  type state_list = (int, state) Hashtbl.t
+  type effect = unit -> unit
+  type effect_list = (int, dependencies) Hashtbl.t
+  type effect_queue = effect list
 
   type view_tree =
     | Leaf_node
     | Tree of {
         name : string;
         children : view_tree list;
-        states : (int, state) Hashtbl.t;
-        effects : (int, state list) Hashtbl.t;
+        states : state_list;
+        effects : effect_list;
       }
-
-  type state_list = (int, state) Hashtbl.t
-  type effect_list = (int, state list) Hashtbl.t
 
   let view_tree : view_tree option ref = ref None
   let current_states : state_list option ref = ref None
   let current_effects : effect_list option ref = ref None
+  let queued_effects : effect_queue ref = ref []
   let state_index = ref 0
   let effect_index = ref 0
   let create_state_list () = Hashtbl.create (module Int)
@@ -34,6 +42,10 @@ module React = struct
     effect_index := 0;
     current_states := Some states;
     current_effects := Some effects
+
+  let run_effects () =
+    List.iter !queued_effects ~f:(fun f -> f ());
+    queued_effects := []
 
   let render (element : ui_element) : ui_element =
     let rec children_tree ?prev_bundle { name; body } props =
@@ -74,11 +86,12 @@ module React = struct
           children_tree ?prev_bundle c props
     in
     view_tree := Some (get_view_tree element !view_tree);
+    run_effects ();
     element
 
   let useState (init : state) : state * (state -> unit) =
     match !current_states with
-    | None -> failwith "useState called before render"
+    | None -> raise Invalid_hook_call
     | Some states ->
         let state =
           match Hashtbl.find states !state_index with
@@ -92,25 +105,33 @@ module React = struct
         Int.incr state_index;
         (state, setState)
 
-  let useEffect (f : unit -> unit)
-      (dependencies : (state * (state -> state -> bool)) list) : unit =
+  let useEffect (f : effect) ?(dependencies : (state * state_eq) list option) ()
+      : unit =
     match !current_effects with
-    | None -> failwith "useEffect called before render"
+    | None -> raise Invalid_hook_call
     | Some effects ->
         let old_deps = Hashtbl.find effects !effect_index in
         let has_changed =
-          match old_deps with
-          | Some old_deps ->
+          match (old_deps, dependencies) with
+          | Some (Dependencies old_deps), Some dependencies
+            when List.length old_deps
+                 = List.length dependencies (* Re-render with useEffect *) ->
               List.existsi dependencies ~f:(fun i (new_state, compare) ->
                   not (compare new_state (List.nth_exn old_deps i)))
-          | None -> true
+          | Some No_dependencies, None (* Re-render with useEffect0 *)
+          | None, None (* Initial render with useEffect0 *)
+          | None, Some _ (* Initial render with useEffect *) ->
+              true
+          | _, _ -> raise Incompatible_useEffect
         in
-        if has_changed then f ();
-        Hashtbl.set effects ~key:!effect_index
-          ~data:(List.map dependencies ~f:fst);
+        if has_changed then queued_effects := f :: !queued_effects;
+        let new_dependencies =
+          match dependencies with
+          | Some dependencies -> Dependencies (List.map dependencies ~f:fst)
+          | None -> No_dependencies
+        in
+        Hashtbl.set effects ~key:!effect_index ~data:new_dependencies;
         Int.incr effect_index
-
-  let useEffect0 f = f ()
 
   let reset () =
     view_tree := None;

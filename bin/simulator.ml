@@ -58,7 +58,7 @@ let great_grandchild =
       name = "GGC";
       body =
         (fun _unit ->
-          useEffect0 (fun () -> printf "great-grandchild\n");
+          useEffect (fun () -> printf "great-grandchild\n") ();
           [ { component = Null; props = Uunit.create () } ]);
     }
 
@@ -69,10 +69,12 @@ let grandchild =
       body =
         (fun f ->
           let show, setShow = useState (Uint.create 0) in
-          useEffect0 (fun () ->
+          useEffect
+            (fun () ->
               printf "grandchild\n";
               (Uint_to_unit.match_exn f) 0;
-              setShow (Uint.create 1));
+              setShow (Uint.create 1))
+            ();
           if Uint.match_exn show = 0 then
             [ { component = Null; props = Uunit.create () } ]
           else [ { component = great_grandchild; props = Uunit.create () } ]);
@@ -84,9 +86,11 @@ let child =
       name = "C";
       body =
         (fun f ->
-          useEffect0 (fun () ->
+          useEffect
+            (fun () ->
               printf "child\n";
-              (Uint_to_unit.match_exn f) 1);
+              (Uint_to_unit.match_exn f) 1)
+            ();
           [ { component = grandchild; props = f } ]);
     }
 
@@ -97,7 +101,7 @@ let parent =
       body =
         (fun _unit ->
           let show, setShow = useState (Uint.create 1) in
-          useEffect0 (fun () -> printf "parent\n");
+          useEffect (fun () -> printf "parent\n") ();
           if Uint.match_exn show = 0 then
             [ { component = Null; props = Uunit.create () } ]
           else
@@ -111,7 +115,9 @@ let parent =
 
 let () =
   reset ();
-  printf "=== Chain test [WIP] ===\n";
+  printf "=== Chain test ===\n";
+  printf "[Pass 1]\n";
   let e = render { component = parent; props = Uunit.create () } in
-  let e = render e in
-  render e |> ignore
+  printf "[Pass 2]\n";
+  let _e = render e in
+  ()
