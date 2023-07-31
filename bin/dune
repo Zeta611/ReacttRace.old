@@ -1,4 +1,5 @@
 (executables
  (public_names react_trace react_simulator)
  (names main simulator)
- (libraries react_trace base stdio))
+ (libraries react_trace base stdio)
+ (modes byte exe))
