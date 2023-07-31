@@ -2,12 +2,6 @@
 
 type univ
 
-module Variant : sig
-  type 'a t = ('a -> univ) * (univ -> 'a option)
-
-  val create : unit -> ('a -> univ) * (univ -> 'a option)
-end
-
 module type S = sig
   type t
 
