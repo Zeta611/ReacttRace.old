@@ -10,8 +10,6 @@ open Base
 type univ = exn
 
 module Variant = struct
-  type 'a t = ('a -> univ) * (univ -> 'a option)
-
   let create (type a) () =
     let exception E of a in
     ((fun x -> E x), function E x -> Some x | _ -> None)
