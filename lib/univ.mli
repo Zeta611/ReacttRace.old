@@ -1,24 +1,26 @@
 (* Signature taken from https://blog.janestreet.com/rethinking-univ/ *)
 
-module Variant : sig
-  type 'a t
+type univ
 
-  val create : unit -> 'a t
+module Variant : sig
+  type 'a t = ('a -> univ) * (univ -> 'a option)
+
+  val create : unit -> ('a -> univ) * (univ -> 'a option)
 end
 
-type t
-
-val create : 'a Variant.t -> 'a -> t
-val match_ : 'a Variant.t -> t -> 'a option
-val match_exn : 'a Variant.t -> t -> 'a
-
-module Make_univ (T : sig
+module type S = sig
   type t
 
-  val ( = ) : t -> t -> bool
-end) : sig
-  val ( = ) : t -> t -> bool
-  val create : T.t -> t
-  val match_ : t -> T.t option
-  val match_exn : t -> T.t
+  val ( = ) : univ -> univ -> bool
+  val create : t -> univ
+  val match_ : univ -> t option
+  val match_exn : univ -> t
 end
+
+module Make_univ : functor
+  (T : sig
+     type t
+
+     val ( = ) : t -> t -> bool
+   end)
+  -> S with type t = T.t

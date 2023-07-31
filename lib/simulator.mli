@@ -1,21 +1,21 @@
 exception Invalid_hook_call
 exception Incompatible_useEffect
+exception Too_many_cycles
 
 module React : sig
-  type state = Univ.t
-  type props = Univ.t
-  type state_eq = state -> state -> bool
-  type effect = unit -> unit
+  type value = Univ.univ
+  type state = value
+  type props = value
+  type state_eq = value -> value -> bool
 
-  type component = Null | Composite of composite_component
-  and composite_component = { name : string; body : props -> ui_element list }
+  type component = { name : string; body : props -> ui_element list }
   and ui_element = { component : component; props : props }
 
+  type effect = unit -> unit
+
   val render : ui_element -> ui_element
-  val useState : state -> state * (state -> unit)
+  val useState : (module Univ.S with type t = 'a) -> 'a -> 'a * ('a -> unit)
 
   val useEffect :
     effect -> ?dependencies:(state * state_eq) list -> unit -> unit
-
-  val reset : unit -> unit
 end
