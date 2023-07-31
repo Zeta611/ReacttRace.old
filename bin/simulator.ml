@@ -53,54 +53,46 @@ end)
      render component |> ignore *)
 
 let great_grandchild =
-  {
-    name = "GGC";
-    body =
-      (fun _unit ->
-        useEffect (fun () -> printf "great-grandchild\n") ();
-        []);
-  }
+  make_component ~name:"GGC"
+    (module Uunit)
+    (fun () ->
+      useEffect (fun () -> printf "great-grandchild\n") ();
+      [])
 
 let grandchild =
-  {
-    name = "GC";
-    body =
-      (fun f ->
-        let show, setShow = useState (module Uint) 0 in
-        useEffect
-          (fun () ->
-            printf "grandchild\n";
-            (Uint_to_unit.match_exn f) 0;
-            setShow 1)
-          ();
-        if show = 0 then []
-        else [ { component = great_grandchild; props = Uunit.create () } ]);
-  }
+  make_component ~name:"GC"
+    (module Uint_to_unit)
+    (fun f ->
+      let show, setShow = useState (module Uint) 0 in
+      useEffect
+        (fun () ->
+          printf "grandchild\n";
+          f 0;
+          setShow 1)
+        ();
+      if show = 0 then []
+      else [ make_element great_grandchild (module Uunit) ~props:() ])
 
 let child =
-  {
-    name = "C";
-    body =
-      (fun f ->
-        useEffect
-          (fun () ->
-            printf "child\n";
-            (Uint_to_unit.match_exn f) 1)
-          ();
-        [ { component = grandchild; props = f } ]);
-  }
+  make_component ~name:"C"
+    (module Uint_to_unit)
+    (fun f ->
+      useEffect
+        (fun () ->
+          printf "child\n";
+          f 1)
+        ();
+      [ make_element grandchild (module Uint_to_unit) ~props:f ])
 
 let parent =
-  {
-    name = "P";
-    body =
-      (fun _unit ->
-        let show, setShow = useState (module Uint) 1 in
-        useEffect (fun () -> printf "parent\n") ();
-        if show = 0 then []
-        else [ { component = child; props = Uint_to_unit.create setShow } ]);
-  }
+  make_component ~name:"P"
+    (module Uunit)
+    (fun () ->
+      let show, setShow = useState (module Uint) 1 in
+      useEffect (fun () -> printf "parent\n") ();
+      if show = 0 then []
+      else [ make_element child (module Uint_to_unit) ~props:setShow ])
 
 let () =
   printf "=== Chain test ===\n";
-  render { component = parent; props = Uunit.create () } |> ignore
+  render @@ make_element parent (module Uunit) ~props:() |> ignore
