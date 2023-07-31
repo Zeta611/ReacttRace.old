@@ -31,10 +31,14 @@ module React = struct
   type component = { name : string; body : props -> ui_element list }
   and ui_element = { component : component; props : props }
 
-  (* type 'a component = {
-    name : string;
-    body : ((module Univ.S with type t = 'a) -> 'a) -> ui_element list;
-  } *)
+  let make_element (type a) (component : component)
+      (module U : Univ.S with type t = a) ~(props : a) : ui_element =
+    { component; props = U.create props }
+
+  let make_component (type a) ~(name : string)
+      (module U : Univ.S with type t = a) (body : a -> ui_element list) :
+      component =
+    { name; body = (fun props -> body (U.match_exn props)) }
 
   type state_entry = {
     current : state;
