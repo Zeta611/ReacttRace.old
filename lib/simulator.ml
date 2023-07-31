@@ -135,9 +135,12 @@ module React = struct
     current_states := Some states;
     current_dependencies := Some dependencies;
 
+    let cycles = ref 0 in
     (* This will run all the code in the component and returns the child
      * element. This includes running `useState`s and `useEffect`s. *)
     let rec loop () =
+      Int.incr cycles;
+      if !cycles > max_cycles then raise Too_many_cycles;
       let child_element = body props in
       if states_changed ~during_render:true states then (
         state_index := 0;
