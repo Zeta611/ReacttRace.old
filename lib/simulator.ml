@@ -64,15 +64,16 @@ module React = struct
 
   let current_states : state_list ref option ref = ref None
   let current_dependencies : dependency_list ref option ref = ref None
-  let queued_effects : effect_queue ref = ref []
+  let current_queued_effects : effect_queue ref = ref []
+  let global_queued_effects : effect_queue ref = ref []
   let state_index = ref 0
   let effect_index = ref 0
   let create_state_list () : state_list ref = ref []
   let create_dependency_list () : dependency_list ref = ref []
 
   let run_effects () =
-    List.iter !queued_effects ~f:(fun f -> f ());
-    queued_effects := []
+    List.iter !global_queued_effects ~f:(fun f -> f ());
+    global_queued_effects := []
 
   let update_states (states : state_list ref) : unit =
     let open List.Let_syntax in
@@ -134,6 +135,7 @@ module React = struct
     effect_index := 0;
     current_states := Some states;
     current_dependencies := Some dependencies;
+    current_queued_effects := [];
 
     let cycles = ref 0 in
     (* This will run all the code in the component and returns the child
@@ -147,10 +149,14 @@ module React = struct
         effect_index := 0;
         (* states should not be reset *)
         current_dependencies := Some dependencies;
+        current_queued_effects := [];
         loop ())
       else child_element
     in
     let child_element = loop () in
+
+    global_queued_effects :=
+      List.rev !current_queued_effects @ !global_queued_effects;
 
     let child =
       match prev_child with
@@ -235,7 +241,8 @@ module React = struct
               true
           | _, _ -> raise Incompatible_useEffect
         in
-        if has_changed then queued_effects := f :: !queued_effects;
+        if has_changed then
+          current_queued_effects := f :: !current_queued_effects;
         let new_dependencies =
           match dependencies with
           | Some dependencies -> Dependencies (List.map dependencies ~f:fst)
